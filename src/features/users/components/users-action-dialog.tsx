@@ -1,8 +1,13 @@
-
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@radix-ui/react-select'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { Select } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,8 +29,14 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { roles } from '../data/data'
-import { type User } from '../data/schema'
+import {
+  type CreateUsuarioInput,
+  createUsuarioSchema,
+  type Usuario as User,
+} from '../data/schema'
+import { useCreateUsuario } from '../hooks/use-usuarios'
 
+/* 
 const formSchema = z
   .object({
     firstName: z.string().min(1, 'First Name is required.'),
@@ -91,7 +102,7 @@ const formSchema = z
     }
   )
 type UserForm = z.infer<typeof formSchema>
-
+ */
 type UserActionDialogProps = {
   currentRow?: User
   open: boolean
@@ -104,7 +115,7 @@ export function UsersActionDialog({
   onOpenChange,
 }: UserActionDialogProps) {
   const isEdit = !!currentRow
-  const form = useForm<UserForm>({
+  /*  const form = useForm<UserForm>({
     resolver: zodResolver(formSchema),
     defaultValues: isEdit
       ? {
@@ -124,12 +135,33 @@ export function UsersActionDialog({
           confirmPassword: '',
           isEdit,
         },
+  }) */
+
+  const { mutate: createUsuario, isPending } = useCreateUsuario()
+  const form = useForm<CreateUsuarioInput>({
+    resolver: zodResolver(createUsuarioSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+      full_name: '',
+      role: 'vendedor',
+    },
   })
 
-  const onSubmit = (values: UserForm) => {
+  /*  const onSubmit = (values: UserForm) => {
     form.reset()
     showSubmittedData(values)
     onOpenChange(false)
+  } */
+
+  const onSubmit = (data: CreateUsuarioInput) => {
+    createUsuario(data, {
+      onSuccess: () => {
+        onSuccess()
+        form.reset()
+      },
+    })
   }
 
   const isPasswordTouched = !!form.formState.dirtyFields.password
@@ -159,65 +191,6 @@ export function UsersActionDialog({
             >
               <FormField
                 control={form.control}
-                name='firstName'
-                render={({ field }) => (
-                  <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
-                    <FormLabel className='col-span-2 text-end'>
-                      First Name
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='John'
-                        className='col-span-4'
-                        autoComplete='off'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className='col-span-4 col-start-3' />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='lastName'
-                render={({ field }) => (
-                  <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
-                    <FormLabel className='col-span-2 text-end'>
-                      Last Name
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='Doe'
-                        className='col-span-4'
-                        autoComplete='off'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className='col-span-4 col-start-3' />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='username'
-                render={({ field }) => (
-                  <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
-                    <FormLabel className='col-span-2 text-end'>
-                      Username
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='john_doe'
-                        className='col-span-4'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className='col-span-4 col-start-3' />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name='email'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -233,26 +206,8 @@ export function UsersActionDialog({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name='phoneNumber'
-                render={({ field }) => (
-                  <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
-                    <FormLabel className='col-span-2 text-end'>
-                      Phone Number
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='+123456789'
-                        className='col-span-4'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className='col-span-4 col-start-3' />
-                  </FormItem>
-                )}
-              />
-              <FormField
+
+              {/*  <FormField
                 control={form.control}
                 name='role'
                 render={({ field }) => (
@@ -271,7 +226,35 @@ export function UsersActionDialog({
                     <FormMessage className='col-span-4 col-start-3' />
                   </FormItem>
                 )}
+              /> */}
+              <FormField
+                control={form.control}
+                name='role'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rol</FormLabel>
+                    <Select
+                      onVolumeChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='Selecciona un rol' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {/* ❌ SIN 'admin' - los admins solo se crean manualmente en BD */}
+                        <SelectItem value='gerente'>Gerente</SelectItem>
+                        <SelectItem value='almacenista'>Almacenista</SelectItem>
+                        <SelectItem value='vendedor'>Vendedor</SelectItem>
+                        <SelectItem value='auditor'>Auditor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
+
               <FormField
                 control={form.control}
                 name='password'
@@ -322,4 +305,7 @@ export function UsersActionDialog({
       </DialogContent>
     </Dialog>
   )
+}
+function onSuccess() {
+  throw new Error('Function not implemented.')
 }

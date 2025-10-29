@@ -1,22 +1,44 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { RegisterInput, LoginInput } from '@/schemas/auth-schema'
+import {
+  type RegisterInput,
+  type LoginInput,
+  loginSchema,
+  registerSchema,
+} from '@/schemas/auth-schema'
 import { useMyAuthStore } from '@/stores/my-auth-store'
 import { supabase } from '@/lib/supabase'
 
 export const useSession = () => {
+  const { setUser, setSession, setIsLoading, setProfile } = useMyAuthStore()
+
   return useQuery({
-    queryKey: ['session'], // 🎯 CLAVE ÚNICA
+    queryKey: ['session'],
     queryFn: async () => {
-      // 🎯 FUNCIÓN QUE FETCHEA
       const {
         data: { session },
         error,
       } = await supabase.auth.getSession()
       if (error) throw error
+
+      setSession(session)
+      setUser(session?.user ?? null)
+
+      // Obtener el perfil COMPLETO del usuario desde tu tabla
+      if (session?.user) {
+        const { data: usuario } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('auth_id', session.user.id) // ← Buscar por auth_id
+          .single()
+
+        setProfile(usuario)
+      }
+
+      setIsLoading(false)
       return session
     },
-    retry: false, // 🎯 NO REINTENTAR SI FALLA
-    refetchOnWindowFocus: false, // 🎯 NO REFETCHEAR AL CAMBIAR DE VENTANA
+    retry: false,
+    refetchOnWindowFocus: false,
   })
 }
 // Login mutation
@@ -25,8 +47,11 @@ export const useLogin = () => {
 
   return useMutation({
     mutationFn: async (credentials: LoginInput) => {
+      // ✅ VALIDAR credenciales con Zod
+      const validatedCredentials = loginSchema.parse(credentials)
+
       const { data, error } =
-        await supabase.auth.signInWithPassword(credentials)
+        await supabase.auth.signInWithPassword(validatedCredentials)
       if (error) throw error
       return data
     },
@@ -38,23 +63,43 @@ export const useLogin = () => {
 
 // Register mutation
 export const useRegister = () => {
+  const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: async (userData: RegisterInput) => {
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: {
-          data: {
-            full_name: userData.full_name,
-          },
-        },
+      // ✅ VALIDAR datos de registro con Zod
+      const validatedData = registerSchema.parse(userData)
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: validatedData.email,
+        password: validatedData.password,
       })
-      if (error) throw error
-      return data
+
+      if (authError) throw authError
+      if (!authData.user) throw new Error('No se pudo crear el usuario')
+
+      const { error: usuarioError } = await supabase.from('usuarios').insert([
+        {
+          auth_id: authData.user.id, // ← ID de autenticación
+          email: validatedData.email,
+          full_name: validatedData.full_name,
+          role: 'vendedor', // ← Rol por defecto para registro público
+          created_by: null, // ← Null porque es auto-registro
+        },
+      ])
+
+      if (usuarioError) {
+        await supabase.auth.admin.deleteUser(authData.user.id)
+        throw usuarioError
+      }
+
+      return authData
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] })
     },
   })
 }
-
 // Logout mutation
 export const useLogout = () => {
   const queryClient = useQueryClient()
