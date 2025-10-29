@@ -2,13 +2,11 @@ import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { AxiosError } from 'axios'
 import {
-  QueryCache,
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { useAuthStore } from '@/stores/auth-store'
 import { handleServerError } from '@/lib/handle-server-error'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
@@ -17,12 +15,13 @@ import { ThemeProvider } from './context/theme-provider'
 import { routeTree } from './routeTree.gen'
 // Styles
 import './styles/index.css'
+import { AuthProvider } from './context/auth-provider'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // eslint-disable-next-line no-console
+         
         if (import.meta.env.DEV) console.log({ failureCount, error })
 
         if (failureCount >= 0 && import.meta.env.DEV) return false
@@ -48,7 +47,7 @@ const queryClient = new QueryClient({
       },
     },
   },
-  queryCache: new QueryCache({
+ /*  queryCache: new QueryCache({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
@@ -66,7 +65,7 @@ const queryClient = new QueryClient({
         }
       }
     },
-  }),
+  }), */
 })
 
 // Create a new router instance
@@ -91,6 +90,7 @@ if (!rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
+        <AuthProvider>
         <ThemeProvider>
           <FontProvider>
             <DirectionProvider>
@@ -98,6 +98,7 @@ if (!rootElement.innerHTML) {
             </DirectionProvider>
           </FontProvider>
         </ThemeProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </StrictMode>
   )
