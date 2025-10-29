@@ -1,27 +1,32 @@
-import { supabase } from "@/lib/supabase"
-import type { RegisterInput,  LoginInput } from "@/schemas/auth-schema"
-import { useMyAuthStore } from "@/stores/my-auth-store"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { RegisterInput, LoginInput } from '@/schemas/auth-schema'
+import { useMyAuthStore } from '@/stores/my-auth-store'
+import { supabase } from '@/lib/supabase'
 
- export const useSession = () => {
+export const useSession = () => {
   return useQuery({
-    queryKey: ['session'],                    // 🎯 CLAVE ÚNICA
-    queryFn: async () => {                    // 🎯 FUNCIÓN QUE FETCHEA
-      const { data: { session }, error } = await supabase.auth.getSession()
+    queryKey: ['session'], // 🎯 CLAVE ÚNICA
+    queryFn: async () => {
+      // 🎯 FUNCIÓN QUE FETCHEA
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
       if (error) throw error
       return session
     },
-    retry: false,                            // 🎯 NO REINTENTAR SI FALLA
-    refetchOnWindowFocus: false,             // 🎯 NO REFETCHEAR AL CAMBIAR DE VENTANA
+    retry: false, // 🎯 NO REINTENTAR SI FALLA
+    refetchOnWindowFocus: false, // 🎯 NO REFETCHEAR AL CAMBIAR DE VENTANA
   })
-} 
+}
 // Login mutation
 export const useLogin = () => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (credentials: LoginInput) => {
-      const { data, error } = await supabase.auth.signInWithPassword(credentials)
+      const { data, error } =
+        await supabase.auth.signInWithPassword(credentials)
       if (error) throw error
       return data
     },
@@ -54,11 +59,12 @@ export const useRegister = () => {
 export const useLogout = () => {
   const queryClient = useQueryClient()
   const { logout } = useMyAuthStore()
-  
+
   return useMutation({
     mutationFn: async () => {
       const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      if (error)
+        throw new Error('Ha ocurriodo un error durante el cierre de sessión')
     },
     onSuccess: () => {
       logout()
@@ -77,7 +83,7 @@ export const useProfile = (userId?: string) => {
         .select('*')
         .eq('id', userId!)
         .single()
-      
+
       if (error) throw error
       return data
     },
