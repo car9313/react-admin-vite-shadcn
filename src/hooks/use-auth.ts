@@ -98,6 +98,10 @@ export const useRegister = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
     },
+    onError: (error) => {
+      console.error('Error en registro:', error)
+      // Manejar el error (mostrar toast, etc.)
+    },
   })
 }
 // Logout mutation
