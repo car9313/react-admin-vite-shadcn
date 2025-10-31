@@ -88,9 +88,14 @@ export const useRegister = () => {
         },
       ])
 
-      if (usuarioError) {
+     /*  if (usuarioError) {
         await supabase.auth.admin.deleteUser(authData.user.id)
         throw usuarioError
+      } */
+       if (usuarioError) {
+        // ❌ NO hacemos rollback, solo informamos el error
+        console.error('Error creando perfil de usuario:', usuarioError)
+        throw new Error('Cuenta creada pero error en el perfil. Contacta al soporte.')
       }
 
       return authData

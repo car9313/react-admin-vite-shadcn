@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,14 +17,25 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { useRegister } from '@/hooks/use-auth'
 import { type RegisterInput, registerSchema } from '@/schemas/auth-schema'
-import { error } from 'console'
+import { toast } from 'sonner'
+import { useNavigate } from '@tanstack/react-router'
+import { useMyAuthStore } from '@/stores/my-auth-store'
 
 
 export function SignUpForm({
   className,
   ...props
 }: React.HTMLAttributes<HTMLFormElement>) {
- const { mutate: register, isPending } = useRegister()
+  const { mutate: register, isPending } = useRegister()
+   const { user } = useMyAuthStore() 
+  const navigate = useNavigate()
+
+   // Redirigir automáticamente si el usuario está autenticado
+  useEffect(() => {
+    if (user) {
+      navigate({ to: '/' })
+    }
+  }, [user, navigate])
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -38,12 +49,21 @@ export function SignUpForm({
 
   const onSubmit = (data: RegisterInput) => {
     register(data, {
-      onSuccess: () => {
-        register(data)
+    onSuccess: (response) => {
+        console.log('Registro exitoso:', response)
+        // NO redirigir aquí - el useEffect lo hará automáticamente
+      },
+      onError: (error) => {
+        if (error.message.includes('perfil')) {
+          // Error en el perfil pero usuario creado
+          toast.error('Cuenta creada pero error en perfil. Contacta soporte.')
+        } else {
+          // Otro error
+          toast.error('Error al crear cuenta: ' + error.message)
+        }
       },
     })
   }
-
   return (
     <Form {...form}>
       <form
@@ -51,7 +71,7 @@ export function SignUpForm({
         className={cn('grid gap-3', className)}
         {...props}
       >
-         <FormField
+        <FormField
           control={form.control}
           name='full_name'
           render={({ field }) => (
