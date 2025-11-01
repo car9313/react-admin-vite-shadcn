@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate } from '@tanstack/react-router'
+import { type LoginInput, loginSchema } from '@/schemas/auth-schema'
 import { Loader2, LogIn } from 'lucide-react'
 import { toast } from 'sonner'
 import { IconFacebook, IconGithub } from '@/assets/brand-icons'
 import { useAuthStore } from '@/stores/auth-store'
 import { sleep, cn } from '@/lib/utils'
+import { useLogin } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -19,18 +21,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { useLogin } from '@/hooks/use-auth'
-import { type LoginInput, loginSchema } from '@/schemas/auth-schema'
-
-/* const formSchema = z.object({
-  email: z.email({
-    error: (iss) => (iss.input === '' ? 'Please enter your email' : undefined),
-  }),
-  password: z
-    .string()
-    .min(1, 'Please enter your password')
-    .min(7, 'Password must be at least 7 characters long'),
-}) */
+import { useMyAuthStore } from '../../../../stores/my-auth-store'
 
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
   redirectTo?: string
@@ -38,14 +29,12 @@ interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
 
 export function UserAuthForm({
   className,
-  redirectTo,
+  redirectTo = '/',
   ...props
 }: UserAuthFormProps) {
- /*  const [isLoading, setIsLoading] = useState(false)
+  const { mutate: login, isPending } = useLogin()
   const navigate = useNavigate()
-  const { auth } = useAuthStore() */
-
-    const { mutate: login, isPending } = useLogin()
+  const { user } = useMyAuthStore() // ← Obtener el estado del usuario
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -54,40 +43,27 @@ export function UserAuthForm({
       password: '',
     },
   })
-
-  const onSubmit=(data:LoginInput) =>{
-  login(data,{
-    onError:(error)=>{
-         console.error('Login error:', error.message)
+  // Efecto para redirigir cuando el usuario esté autenticado
+  useEffect(() => {
+    if (user) {
+      console.log('✅ Usuario autenticado, redirigiendo...')
+      navigate({ to: redirectTo })
     }
-  })
-//    setIsLoading(true)
+  }, [user, navigate, redirectTo])
 
-   /*  toast.promise(sleep(2000), {
-      loading: 'Signing in...',
-      success: () => {
-        setIsLoading(false)
-
-        // Mock successful authentication with expiry computed at success time
-        const mockUser = {
-          accountNo: 'ACC001',
-          email: data.email,
-          role: ['user'],
-          exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
-        }
-
-        // Set user and access token
-        auth.setUser(mockUser)
-        auth.setAccessToken('mock-access-token')
-
-        // Redirect to the stored location or default to dashboard
-        const targetPath = redirectTo || '/'
-        navigate({ to: targetPath, replace: true })
-
-        return `Welcome back, ${data.email}!`
+  const onSubmit = (data: LoginInput) => {
+    login(data, {
+      onSuccess: () => {
+        toast.success('¡Bienvenido de vuelta!')
       },
-      error: 'Error',
-    }) */
+      onError: (error) => {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Email o contraseña incorrectos')
+        } else {
+          toast.error('Error al iniciar sesión')
+        }
+      },
+    })
   }
 
   return (

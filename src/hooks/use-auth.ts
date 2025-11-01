@@ -1,3 +1,4 @@
+import { use } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type RegisterInput,
@@ -20,6 +21,7 @@ export const useSession = () => {
       } = await supabase.auth.getSession()
       if (error) throw error
 
+      console.log(session)
       setSession(session)
       setUser(session?.user ?? null)
 
@@ -31,6 +33,7 @@ export const useSession = () => {
           .eq('auth_id', session.user.id) // ← Buscar por auth_id
           .single()
 
+        console.log(usuario)
         setProfile(usuario)
       }
 
@@ -42,21 +45,34 @@ export const useSession = () => {
   })
 }
 // Login mutation
+// hooks/use-auth.ts - useLogin mejorado
 export const useLogin = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (credentials: LoginInput) => {
-      // ✅ VALIDAR credenciales con Zod
       const validatedCredentials = loginSchema.parse(credentials)
 
       const { data, error } =
         await supabase.auth.signInWithPassword(validatedCredentials)
-      if (error) throw error
+
+      if (error) {
+        console.error('Error en Supabase Auth:', error)
+        throw new Error(`Error de autenticación: ${error.message}`)
+      }
+
+      if (!data.session) {
+        throw new Error('No se pudo crear la sesión')
+      }
+
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Login exitoso, sesión:', data.session)
       queryClient.invalidateQueries({ queryKey: ['session'] })
+    },
+    onError: (error) => {
+      console.error('Error completo en useLogin:', error)
     },
   })
 }
@@ -88,14 +104,16 @@ export const useRegister = () => {
         },
       ])
 
-     /*  if (usuarioError) {
+      /*  if (usuarioError) {
         await supabase.auth.admin.deleteUser(authData.user.id)
         throw usuarioError
       } */
-       if (usuarioError) {
+      if (usuarioError) {
         // ❌ NO hacemos rollback, solo informamos el error
         console.error('Error creando perfil de usuario:', usuarioError)
-        throw new Error('Cuenta creada pero error en el perfil. Contacta al soporte.')
+        throw new Error(
+          'Cuenta creada pero error en el perfil. Contacta al soporte.'
+        )
       }
 
       return authData

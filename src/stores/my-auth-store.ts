@@ -6,6 +6,13 @@ interface Profile {
   id: string
   username: string
   avatar_url?: string
+  // Agrega los campos que tienes en tu tabla usuarios
+  email?: string
+  full_name?: string
+  role?: string
+  auth_id?: string
+  created_by?: number | null
+  created_at?: string
 }
 
 interface AuthState {
