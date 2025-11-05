@@ -1,4 +1,3 @@
-import { use } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type RegisterInput,
@@ -10,6 +9,7 @@ import { useMyAuthStore } from '@/stores/my-auth-store'
 import { supabase } from '@/lib/supabase'
 
 export const useSession = () => {
+  console.log('useSession called')
   const { setUser, setSession, setIsLoading, setProfile } = useMyAuthStore()
 
   return useQuery({
@@ -32,8 +32,6 @@ export const useSession = () => {
           .select('*')
           .eq('auth_id', session.user.id) // ← Buscar por auth_id
           .single()
-
-        console.log(usuario)
         setProfile(usuario)
       }
 
@@ -45,7 +43,6 @@ export const useSession = () => {
   })
 }
 // Login mutation
-// hooks/use-auth.ts - useLogin mejorado
 export const useLogin = () => {
   const queryClient = useQueryClient()
 
@@ -97,9 +94,8 @@ export const useRegister = () => {
       const { error: usuarioError } = await supabase.from('usuarios').insert([
         {
           auth_id: authData.user.id, // ← ID de autenticación
-          email: validatedData.email,
           full_name: validatedData.full_name,
-          role: 'vendedor', // ← Rol por defecto para registro público
+          role: 'admin', // ← Rol por defecto para registro público
           created_by: null, // ← Null porque es auto-registro
         },
       ])
@@ -136,7 +132,9 @@ export const useLogout = () => {
     mutationFn: async () => {
       const { error } = await supabase.auth.signOut()
       if (error)
-        throw new Error('Ha ocurriodo un error durante el cierre de sessión')
+        throw new Error(
+          'Ha ocurriodo un error durante el cierre de sessión' + error
+        )
     },
     onSuccess: () => {
       logout()

@@ -59,6 +59,8 @@ export function UserAuthForm({
       onError: (error) => {
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Email o contraseña incorrectos')
+        } else if (error.message.includes('Failed to fetch')) {
+          toast.error('Error al conectar con el servidor')
         } else {
           toast.error('Error al iniciar sesión')
         }

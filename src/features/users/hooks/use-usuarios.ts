@@ -42,7 +42,6 @@ export const useCreateUsuario = () => {
       const { error: usuarioError } = await supabase.from('usuarios').insert([
         {
           auth_id: authData.user.id, // ← ID de autenticación
-          email: validatedData.email,
           full_name: validatedData.full_name,
           role: validatedData.role,
           created_by: adminUser.id, // ← ID del admin que lo creó
