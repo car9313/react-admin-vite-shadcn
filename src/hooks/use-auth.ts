@@ -7,6 +7,9 @@ import {
 } from '@/schemas/auth-schema'
 import { useMyAuthStore } from '@/stores/my-auth-store'
 import { supabase } from '@/lib/supabase'
+import { createSupabaseAuthRepository } from '../features/auth/adapters/supabaseAuthAdapter'
+
+const authRepo = createSupabaseAuthRepository()
 
 export const useSession = () => {
   console.log('useSession called')
@@ -49,19 +52,8 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: async (credentials: LoginInput) => {
       const validatedCredentials = loginSchema.parse(credentials)
-
-      const { data, error } =
-        await supabase.auth.signInWithPassword(validatedCredentials)
-
-      if (error) {
-        console.error('Error en Supabase Auth:', error)
-        throw new Error(`Error de autenticación: ${error.message}`)
-      }
-
-      if (!data.session) {
-        throw new Error('No se pudo crear la sesión')
-      }
-
+      const data = await authRepo.login(validatedCredentials)
+      if (data.error) throw data.error
       return data
     },
     onSuccess: (data) => {
@@ -82,36 +74,7 @@ export const useRegister = () => {
     mutationFn: async (userData: RegisterInput) => {
       // ✅ VALIDAR datos de registro con Zod
       const validatedData = registerSchema.parse(userData)
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: validatedData.email,
-        password: validatedData.password,
-      })
-
-      if (authError) throw authError
-      if (!authData.user) throw new Error('No se pudo crear el usuario')
-
-      const { error: usuarioError } = await supabase.from('usuarios').insert([
-        {
-          auth_id: authData.user.id, // ← ID de autenticación
-          full_name: validatedData.full_name,
-          role: 'admin', // ← Rol por defecto para registro público
-          created_by: null, // ← Null porque es auto-registro
-        },
-      ])
-
-      /*  if (usuarioError) {
-        await supabase.auth.admin.deleteUser(authData.user.id)
-        throw usuarioError
-      } */
-      if (usuarioError) {
-        // ❌ NO hacemos rollback, solo informamos el error
-        console.error('Error creando perfil de usuario:', usuarioError)
-        throw new Error(
-          'Cuenta creada pero error en el perfil. Contacta al soporte.'
-        )
-      }
-
+      const authData = await authRepo.registerPublic(validatedData)
       return authData
     },
     onSuccess: () => {
@@ -130,11 +93,7 @@ export const useLogout = () => {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.auth.signOut()
-      if (error)
-        throw new Error(
-          'Ha ocurriodo un error durante el cierre de sessión' + error
-        )
+      await authRepo.signOut()
     },
     onSuccess: () => {
       logout()

@@ -2,10 +2,10 @@ import { type User, type Session } from '@supabase/supabase-js'
 import { create } from 'zustand'
 
 export interface Profile {
-  id: string
-  full_name?: string
-  role?: string
-  auth_id?: string
+  id: number
+  full_name: string
+  role: string
+  auth_id: string
   created_by?: number | null
 }
 
@@ -30,5 +30,5 @@ export const useMyAuthStore = create<AuthState>()((set) => ({
   setSession: (session) => set({ session }),
   setProfile: (profile) => set({ profile }),
   setIsLoading: (isLoading) => set({ isLoading }),
-  logout: () => {},
+  logout: () => set({ user: null, session: null, profile: null }),
 }))
