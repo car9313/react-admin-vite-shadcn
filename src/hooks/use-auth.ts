@@ -11,44 +11,13 @@ import { createSupabaseAuthRepository } from '../features/auth/adapters/supabase
 
 const authRepo = createSupabaseAuthRepository()
 
-export const useSession = () => {
-  console.log('useSession called')
-  const { setUser, setSession, setIsLoading, setProfile } = useMyAuthStore()
-
-  return useQuery({
-    queryKey: ['session'],
-    queryFn: async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-      if (error) throw error
-
-      console.log(session)
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      // Obtener el perfil COMPLETO del usuario desde tu tabla
-      if (session?.user) {
-        const { data: usuario } = await supabase
-          .from('usuarios')
-          .select('*')
-          .eq('auth_id', session.user.id) // ← Buscar por auth_id
-          .single()
-        setProfile(usuario)
-      }
-
-      setIsLoading(false)
-      return session
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-  })
-}
+/* export const useSessionUser = () => {
+para que chapgpt lo lea me gustaria usar el getSessionUser
+} */
 // Login mutation
+
 export const useLogin = () => {
   const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (credentials: LoginInput) => {
       const validatedCredentials = loginSchema.parse(credentials)
@@ -59,6 +28,7 @@ export const useLogin = () => {
     onSuccess: (data) => {
       console.log('Login exitoso, sesión:', data.session)
       queryClient.invalidateQueries({ queryKey: ['session'] })
+      queryClient.invalidateQueries({ queryKey: ['profile', data.user?.id] })
     },
     onError: (error) => {
       console.error('Error completo en useLogin:', error)
@@ -108,7 +78,7 @@ export const useProfile = (userId?: string) => {
     queryKey: ['profile', userId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('usuarios')
         .select('*')
         .eq('id', userId!)
         .single()

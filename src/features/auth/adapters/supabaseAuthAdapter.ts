@@ -8,20 +8,12 @@ import {
   type LoginInput,
   type RegisterInput,
 } from '../../../schemas/auth-schema'
-import { type Profile } from '../../../stores/my-auth-store'
-import type { AuthRepository, AuthError as DomainAuthError } from '../types'
-
-/**
- * AuthUser coincide con la tabla `usuarios`
- */
-export type AuthUser = {
-  id: number
-  auth_id: string
-  email: string
-  full_name: string
-  role: string
-  created_by?: number | null
-}
+import type {
+  AuthRepository,
+  AuthUser,
+  AuthError as DomainAuthError,
+  Profile,
+} from '../types'
 
 /** Guardas de tipo útiles (evitan usar `any`) */
 const isErrorLike = (v: unknown): v is { message?: unknown; name?: unknown } =>
@@ -51,8 +43,7 @@ const extractMessage = (err: unknown): string => {
  * - exige id y auth_id (si faltan -> lanza)
  * - devuelve strings/fallbacks que tu DTO requiere
  */
-// Mapper estricto: Opción B
-const mapDbUsuarioToAuthUser = (
+export const mapDbUsuarioToAuthUser = (
   row: Profile | null,
   supabaseUser?: SupabaseUser
 ): AuthUser => {
@@ -131,7 +122,7 @@ export const createSupabaseAuthRepository = (opts?: {
       }
 
       const supUser = res.data?.user ?? null
-      const session = res.data?.session ?? undefined // <-- nunca null, usamos undefined
+      const session = res.data?.session ?? null
 
       if (!supUser) {
         return {
@@ -268,21 +259,25 @@ export const createSupabaseAuthRepository = (opts?: {
 
   const getSessionUser = async () => {
     try {
-      const { data, error } = await client.auth.getUser()
-      if (error) {
+      // Obtener la sesión completa (incluye session.user si existe)
+      const { data: sessionData, error: sessionError } =
+        await client.auth.getSession()
+      if (sessionError) {
         return {
-          error: {
-            code: getErrorName(error) ?? 'AUTH_ERROR',
-            message: getErrorMessage(error) ?? 'Error al obtener sesión',
-          } as DomainAuthError,
+          error: { message: extractMessage(sessionError) } as DomainAuthError,
         }
       }
 
-      const supUser = data?.user ?? null
+      // session será Session | undefined
+      const session = sessionData?.session ?? undefined
+      const supUser = session?.user ?? null
+
+      // Si no hay usuario en la sesión, no hay sesión activa
       if (!supUser) {
         return { error: { message: 'No hay sesión activa' } as DomainAuthError }
       }
 
+      // Buscar perfil en la tabla `usuarios` por auth_id
       const { data: usuarioRow, error: usuarioError } = await client
         .from('usuarios')
         .select('*')
@@ -296,6 +291,7 @@ export const createSupabaseAuthRepository = (opts?: {
         }
       }
 
+      // Flujo estricto: si no hay fila usuarios, devolvemos error
       if (!usuarioRow) {
         return {
           error: {
@@ -304,6 +300,7 @@ export const createSupabaseAuthRepository = (opts?: {
         }
       }
 
+      // Mapear y validar estrictamente; mapper lanzará si falta algún campo obligatorio
       let user: AuthUser
       try {
         user = mapDbUsuarioToAuthUser(usuarioRow, supUser)
@@ -311,8 +308,8 @@ export const createSupabaseAuthRepository = (opts?: {
         return { error: { message: extractMessage(mErr) } as DomainAuthError }
       }
 
-      // En getSessionUser devolvemos session undefined (no null)
-      return { user, session: undefined }
+      // Devolvemos el user y la session (Session | undefined)
+      return { user, session }
     } catch (err: unknown) {
       return { error: { message: extractMessage(err) } as DomainAuthError }
     }

@@ -1,77 +1,97 @@
-import React, { useEffect } from 'react'
-// tu cliente supabase
-import { useMyAuthStore } from '@/stores/my-auth-store'
-import { supabase } from '@/lib/supabase'
+// src/app/providers/AuthProvider.tsx
+import { useEffect } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { createSupabaseAuthRepository } from '@/features/auth/adapters/supabaseAuthAdapter'
+import { useMyAuthStore } from '../stores/my-auth-store'
 
-// zustand (setUser, setSession, setIsLoading)
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const setAuth = useMyAuthStore((s) => s.setAuth)
+  const clearAuth = useMyAuthStore((s) => s.clearAuth ?? s.logout)
+  const setIsLoading = useMyAuthStore((s) => s.setIsLoading)
+  const isLoading = useMyAuthStore((s) => s.isLoading)
+  const handleSessionChange = useMyAuthStore((s) => s.handleSessionChange)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setSession, isLoading, setIsLoading } = useMyAuthStore()
-
-  // Inicializa inmediatamente la sesión actual al montar
   useEffect(() => {
+    const repo = createSupabaseAuthRepository()
     let mounted = true
 
-    async function init() {
-      console.log('AuthProvider - iniciando sesión inicial')
+    const normalize = (sess?: Session | null) => sess ?? null
+
+    const fetchAndSetAuth = async (allowClear = true) => {
+      setIsLoading(true)
       try {
-        setIsLoading(true)
-        const { data, error } = await supabase.auth.getSession()
-        if (error) {
-          // opcional: manejar/loggear error
-        } else if (mounted) {
-          console.log('AuthProvider - sesión inicial obtenida:', data)
-          const session = data?.session ?? null
-          setSession(session)
-          setUser(session?.user ?? null)
+        if (!mounted) return
+        const res = await repo.getSessionUser()
+        if (!mounted) return
+        if (res.user) {
+          setAuth({ user: res.user, session: normalize(res.session) })
+        } else if (allowClear) {
+          clearAuth()
         }
+      } catch (e) {
+        console.error('[AuthProvider] fetchAndSetAuth error', e)
+        clearAuth()
       } finally {
-        if (mounted) setIsLoading(false)
+        setIsLoading(false)
       }
     }
 
-    init()
+    const rehydrate = async () => {
+      console.log('[AuthProvider] rehydrating auth state')
+      await fetchAndSetAuth(true)
+    }
+
+    rehydrate()
+
+    const onAuthStateChange = async (
+      event: string,
+      session: Session | null
+    ) => {
+      const newSession = normalize(session)
+
+      // If there's no session (signed out / deleted) clear the store and exit.
+      // NOTE: when session === null we must NOT try the fast-path nor refetch.
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED' || !newSession) {
+        clearAuth()
+        return
+      }
+
+      // Delegate session-change handling to the store. The store knows the
+      // current user snapshot and can decide whether the incoming session
+      // belongs to the same identity (fast path: update tokens only). If the
+      // store returns true the session was applied and we can avoid a network
+      // revalidation; otherwise we call fetchAndSetAuth() to obtain the
+      // authoritative user+session from the backend.
+      try {
+        const handled = handleSessionChange?.(newSession)
+        if (handled) return
+      } catch (e) {
+        // If store handler throws for any reason, fall back to revalidation
+        console.error('[AuthProvider] handleSessionChange error', e)
+      }
+
+      await fetchAndSetAuth(true)
+    }
+
+    const sub = repo.onAuthStateChange(onAuthStateChange)
 
     return () => {
       mounted = false
-    }
-  }, [setSession, setUser, setIsLoading])
-
-  // Luego suscribimos para cambios en tiempo real
-  useEffect(() => {
-    console.log('AuthProvider - suscribiéndose a cambios de auth state')
-    // La API de supabase puede retornar { data: { subscription } } o un objeto directo según versiones
-    const res = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('AuthProvider - evento de auth state change:', event, session)
-      // Actualizamos store basado en el evento
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      // Puedes tomar acciones según event:
-      // if (event === 'SIGNED_IN') fetchProfile(session.user.id)
-      // if (event === 'SIGNED_OUT') cleanup()
-    })
-
-    // Normaliza la suscripción para soportar distintas versiones del SDK
-    const subscription = res?.data?.subscription ?? res
-
-    return () => {
       try {
-        subscription?.unsubscribe?.()
-      } catch (err) {
-        // safe cleanup
+        sub?.unsubscribe?.()
+      } catch {
+        // noop
       }
     }
-  }, [setSession, setUser])
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  console.log('AuthProvider render, isLoading:', isLoading)
   if (isLoading) {
     return (
       <div className='flex min-h-screen items-center justify-center'>
-        {/* spinner accesible */}
         <span>Loading...</span>
       </div>
     )
   }
-
   return <>{children}</>
 }

@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, isLoading } = useMyAuthStore()
   const navigate = useNavigate()
-
+  console.log(isLoading)
   useEffect(() => {
     if (!isLoading && !user) {
       navigate({ to: '/sign-in' })
@@ -18,14 +18,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, [user, isLoading, navigate])
 
   if (isLoading) {
-    return (
-      <div className='flex min-h-screen items-center justify-center'>
-        <Loader2 className='h-8 w-8 animate-spin' />
-      </div>
-    )
-  }
-
-  if (!user) {
+    console.log('Cargando autenticación...')
     return (
       <div className='flex min-h-screen items-center justify-center'>
         <Loader2 className='h-8 w-8 animate-spin' />
